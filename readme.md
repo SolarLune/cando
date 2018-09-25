@@ -58,22 +58,24 @@ You can also create a data structure to contain data that is linked to a State, 
 
 ```go
 
-type EatingState struct {
+type Eating struct {
 
     Fullness int32
     State gofsm.State
 
 }
 
-func (a *EatingState) Update() {
+func (a *Eating) Update() {
 
-    a.Fullness++
+    if a.Fullness < 100 {
+        a.Fullness++
+    }
 
 }
 
-func NewEatingState() EatingState {
+func NewEating() Eating {
 
-    a := EatingState{}
+    a := Eating{}
     a.State = gofsm.State{ Update: a.Update }
     return a
 
@@ -81,4 +83,4 @@ func NewEatingState() EatingState {
 
 ```
 
-Then you could pass a newly created EatingState struct's `State` into an FSM to update, and it would increment the EatingState's Fullness value.
+Then you could pass a newly created Eating struct's `State` field into an FSM to update, and it would increment the Eating struct's Fullness value.
