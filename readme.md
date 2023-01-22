@@ -1,11 +1,11 @@
 
-# gofsm
+# CanDo 💪
 
-Gofsm is a simple finite state machine for Golang. 
+CanDo is a simple finite state machine for Golang. 
 
 # Why
 
-I created it because I wanted something super-duper simple for game development, and thought the existing FSMs for Go were a bit over-engineered for my needs.
+I created it because I wanted something super-duper simple for game development, and thought the existing FSMs for Go were a bit over-engineered for my needs (where I know which states I'm switching into for an object and already know that the states are valid, for example).
 
 # Installation
 
@@ -88,57 +88,9 @@ func main() {
 
 ## Why didn't you go (haha) the "correct" route and have the State be an interface that could be implemented by any fulfilling struct?
 
-Because that would mean that you would _have_ to have a struct and **all** three functions for any new State you want to make. That also means that you'd HAVE to define complete States outside of functions. This way might be a bit more awkward when registering States with a state machine, but it also means that a complete State could also just be a single line, or could point to other functions, even those from a struct's methods, as seen above.
+For simplicity, States are hard-coded and you simply override the functions. Not all functions need to be implemented, as by default, States don't call Enter, Update, or Exit functions unless they're defined. This cuts down on boilerplate code considerably.
 
-So instead of forcing this:
-```go
+## To-do
 
-type Waiting struct {}
-func (w *Waiting) Enter() {}
-func (w *Waiting) Update() { fmt.Println("Time passes.") }
-func (w *Waiting) Exit() {}
-
-func main() {
-
-    fsm := gofsm.NewFSM()
-    fsm.Register("waiting", Waiting{})
-
-}
-
-```
-
-It allows for this:
-
-```go
-
-func main() {
-    
-    fsm := gofsm.NewFSM()
-    fsm.Register("waiting", gofsm.State{ Update: func(){ fmt.Println("Time passes.") })
-
-}
-
-    // Or:
-
-func main() {
-
-    fsm := gofsm.NewFSM()
-
-    wait := func() {
-        fmt.Println("Time passes.")
-    }
-
-    fsm.Register("waiting", gofsm.State{ Update: wait })
-
-}
-
-    // Or:
-
-func main() {
-
-    fsm := gofsm.NewFSM()
-    fsm.Register("waiting", gofsm.State{ Update: someObject.someFunction })
-
-}
-
-```
+- [ ] Add some method of indicating which states may be passed into from other ones
+- [ ] Add decision trees
