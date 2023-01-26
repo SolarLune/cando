@@ -12,13 +12,19 @@ import (
 
 func IdleState(human *Human) cando.State {
 
+	turnsInState := 0
+
 	return cando.State{
+
+		Enter: func() { turnsInState = 0 },
 
 		Update: func() {
 
 			human.Hunger -= 10
 
-			fmt.Println("My hunger level is at: ", human.Hunger)
+			turnsInState++
+
+			fmt.Println("Idle Turn", turnsInState, ": My hunger level is at: ", human.Hunger)
 
 			if human.Hunger <= 20 {
 				fmt.Println("I've reached my limit; I'm getting something to eat.")
@@ -34,15 +40,23 @@ func IdleState(human *Human) cando.State {
 
 func SearchState(human *Human) cando.State {
 
+	turnsInState := 0
+
 	return cando.State{
 
+		Enter: func() { turnsInState = 0 },
+
 		Update: func() {
+
+			turnsInState++
+
 			if rand.Float32() < 0.2 {
-				fmt.Println("Ah, found something to eat!")
+				fmt.Println("Search Turn", turnsInState, ": Ah, found something to eat!")
 				human.FSM.Change("eating")
 			} else {
-				fmt.Println("Hmm... I searched, but there wasn't anything to eat.")
+				fmt.Println("Search Turn", turnsInState, ": Hmm... I searched, but there wasn't anything to eat.")
 			}
+
 		},
 	}
 
@@ -52,15 +66,24 @@ func SearchState(human *Human) cando.State {
 
 func EatingState(human *Human) cando.State {
 
+	turnsInState := 0
+
 	return cando.State{
-		Enter: func() { fmt.Println("Finally, some good grub!") },
+
+		Enter: func() {
+			turnsInState = 0
+			fmt.Println("Finally, some good grub!")
+		},
+
 		Update: func() {
+			turnsInState++
 			human.Hunger += 10
-			fmt.Println("*Chomp* *Smack* : ", human.Hunger)
+			fmt.Println("Eating Turn", turnsInState, ": *Chomp* *Smack* : ", human.Hunger)
 			if human.Hunger >= 100 {
 				human.FSM.Change("idle")
 			}
 		},
+
 		Exit: func() { fmt.Println("Phew, that was good. Back to doing nothing.") },
 	}
 
