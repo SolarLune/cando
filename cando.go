@@ -1,73 +1,149 @@
 package cando
 
-// IState is a basic interface that works like you would expect.
+import "errors"
+
+const ErrorInvalidState = "error: fsm object is attempting to switch to an undefined state"
+const ErrorStateSwitchInvalid = "error: fsm object is attempting to switch to a state that is not allowed to be switched to from the current one"
+
+// State is a basic struct that allows you to define how a State functions.
 type State struct {
-	Enter  func()
-	Update func()
-	Exit   func()
+	id       any
+	OnEnter  func(prev, current *State, args ...any) // Enter is called when the state is entered from either no State, or a previous State.
+	OnUpdate func(current *State, args ...any)       // Update is called whenever FSM.Update() is called and the state is active.
+	OnExit   func(current, next *State, args ...any) // Exit is called when the state is exited as the FSM transitions from the current state to a new one.
+
+	// Allowed is a function that determines if one State allows transition to another through
+	// the FSM.Change() function.
+	// If the function returns true, the state is switched; if not, the state remains the same.
+	// If the function is not defined, then all state transitions are allowed.
+	Allowed func(targetState *State) bool
+
+	// Allows you to define tags to identify and check for States.
+	Tags []any
 }
 
-// TODO: Add something to define and return if states can enter into other ones.
+func (s *State) HasTag(tag any) bool {
+	for _, t := range s.Tags {
+		if t == tag {
+			return true
+		}
+	}
+	return false
+}
 
 // FSM represents a Finite State Machine, which can have one State active at a time.
 type FSM struct {
-	CurrentState string
-	States       map[string]State
+	currentState    *State
+	prevState       *State
+	nextState       *State
+	stateChangeArgs []any
+	States          map[any]*State
 }
 
 // NewFSM creates a new FSM and returns it.
 func NewFSM() *FSM {
 	fsm := &FSM{}
-	fsm.States = make(map[string]State, 0)
+	fsm.States = make(map[any]*State, 0)
 	return fsm
 }
 
 // Update runs the Update() on the active State.
-func (f *FSM) Update() {
+// Any args provided are passed to the active state's OnUpdate() callback.
+func (f *FSM) Update(args ...any) {
 
-	if f.CurrentState != "" && f.States[f.CurrentState].Update != nil {
-		f.States[f.CurrentState].Update()
-	} else {
-		panic("Update() called on FSM without an active state")
+	prevState := f.prevState
+	nextState := f.nextState
+
+	f.prevState = nil
+	f.nextState = nil
+
+	if prevState != nil {
+		if prevState.OnExit != nil {
+			prevState.OnExit(prevState, nextState, f.stateChangeArgs...)
+		}
+	}
+
+	if nextState != nil {
+		if nextState.OnEnter != nil {
+			nextState.OnEnter(prevState, nextState, f.stateChangeArgs...)
+		}
+		f.currentState = nextState
+	}
+
+	if f.currentState != nil && f.currentState.OnUpdate != nil {
+		f.currentState.OnUpdate(f.currentState, args...)
 	}
 
 }
 
-// Register registers a State with its name.
-func (f *FSM) Register(name string, state State) {
-	f.States[name] = state
+// Returns if the FSM is currently running a State with the given ID.
+func (f *FSM) IsInStateWithID(stateID any) bool {
+	return f.currentState != nil && f.currentState.id == stateID
 }
 
-// Unregister removes a State from the FSM using its name.
-func (f *FSM) Unregister(name string) {
-	delete(f.States, name)
+// Returns if the FSM is currently running a State with all of the given tags.
+func (f *FSM) IsInStateWithTags(tags ...any) bool {
+	if f.currentState != nil {
+		for _, tag := range tags {
+
+			hasTag := false
+			for _, t := range f.currentState.Tags {
+				if t == tag {
+					hasTag = true
+					break
+				}
+			}
+			if !hasTag {
+				return false
+			}
+
+		}
+		return true
+	}
+	return false
 }
 
-// HasState returns if the FSM has a State associated with the name in its directory.
-func (f *FSM) HasState(name string) bool {
-	_, hasKey := f.States[name]
+// Register registers a State with its id.
+func (f *FSM) Register(id any, state *State) {
+	state.id = id
+	f.States[id] = state
+}
+
+// Unregister removes a State from the FSM using its id.
+func (f *FSM) Unregister(id any) {
+	delete(f.States, id)
+}
+
+// HasState returns if the FSM has a State associated with the id in its directory.
+func (f *FSM) HasState(id any) bool {
+	_, hasKey := f.States[id]
 	return hasKey
 }
 
-// Change allows you to change the current, "main" State assigned to the FSM. If you run Change(), it will call
-// Exit() on the previous State and Enter() on the next State.
-func (f *FSM) Change(stateName string) State {
+// Allows you to set the current State assigned to the FSM.
+// After changing a State, it will call Exit() on the previous State and
+// Enter() on the next State on the next Update() call.
+// If the state cannot be set, the function will return an error.
+func (f *FSM) Set(toStateID any, args ...any) error {
 
-	if f.CurrentState != "" && f.States[f.CurrentState].Exit != nil {
-		f.States[f.CurrentState].Exit()
-	}
-
-	_, hasKey := f.States[stateName]
+	nextState, hasKey := f.States[toStateID]
 	if !hasKey {
-		panic("Error: FSM object is attempting to switch to an invalid / undefined state: " + stateName)
+		return errors.New(ErrorInvalidState)
 	}
 
-	f.CurrentState = stateName
-
-	if f.CurrentState != "" && f.States[f.CurrentState].Enter != nil {
-		f.States[f.CurrentState].Enter()
+	if f.currentState != nil && f.currentState.Allowed != nil && !f.currentState.Allowed(nextState) {
+		return errors.New(ErrorStateSwitchInvalid)
 	}
 
-	return f.States[f.CurrentState]
+	f.prevState = f.currentState
+	f.nextState = nextState
+	f.stateChangeArgs = args
 
+	return nil
+
+}
+
+// State returns the state machine's current State.
+func (f *FSM) State() *State {
+	return f.currentState
 }
