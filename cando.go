@@ -33,11 +33,14 @@ func (s *State) HasTag(tag any) bool {
 
 // FSM represents a Finite State Machine, which can have one State active at a time.
 type FSM struct {
-	currentState    *State
-	prevState       *State
-	nextState       *State
-	stateChangeArgs []any
-	States          map[any]*State
+	currentState *State
+	prevState    *State
+	nextState    *State
+
+	currentStateArgs []any
+	nextStateArgs    []any
+
+	States map[any]*State
 }
 
 // NewFSM creates a new FSM and returns it.
@@ -48,8 +51,7 @@ func NewFSM() *FSM {
 }
 
 // Update runs the Update() on the active State.
-// Any args provided are passed to the active state's OnUpdate() callback.
-func (f *FSM) Update(args ...any) {
+func (f *FSM) Update() {
 
 	prevState := f.prevState
 	nextState := f.nextState
@@ -59,19 +61,21 @@ func (f *FSM) Update(args ...any) {
 
 	if prevState != nil {
 		if prevState.OnExit != nil {
-			prevState.OnExit(prevState, nextState, f.stateChangeArgs...)
+			prevState.OnExit(prevState, nextState, f.currentStateArgs...)
 		}
 	}
 
 	if nextState != nil {
 		if nextState.OnEnter != nil {
-			nextState.OnEnter(prevState, nextState, f.stateChangeArgs...)
+			nextState.OnEnter(prevState, nextState, f.nextStateArgs...)
 		}
 		f.currentState = nextState
 	}
 
+	f.currentStateArgs = f.nextStateArgs
+
 	if f.currentState != nil && f.currentState.OnUpdate != nil {
-		f.currentState.OnUpdate(f.currentState, args...)
+		f.currentState.OnUpdate(f.currentState, f.currentStateArgs...)
 	}
 
 }
@@ -121,8 +125,9 @@ func (f *FSM) HasState(id any) bool {
 }
 
 // Allows you to set the current State assigned to the FSM.
-// After changing a State, it will call Exit() on the previous State and
-// Enter() on the next State on the next Update() call.
+// Any args passed will be accessible in the target State's OnEnter(), OnUpdate(), and OnExit() calls.
+// After changing a State, it will call OnExit() on the previous State and
+// OnEnter() on the next State on the next OnUpdate() call.
 // If the state cannot be set, the function will return an error.
 func (f *FSM) Set(toStateID any, args ...any) error {
 
@@ -137,7 +142,7 @@ func (f *FSM) Set(toStateID any, args ...any) error {
 
 	f.prevState = f.currentState
 	f.nextState = nextState
-	f.stateChangeArgs = args
+	f.nextStateArgs = args
 
 	return nil
 
