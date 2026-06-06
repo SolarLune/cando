@@ -1,6 +1,8 @@
 package cando
 
-import "errors"
+import (
+	"errors"
+)
 
 const ErrorInvalidState = "error: fsm object is attempting to switch to an undefined state"
 const ErrorStateSwitchInvalid = "error: fsm object is attempting to switch to a state that is not allowed to be switched to from the current one"
@@ -12,11 +14,11 @@ type State struct {
 	OnUpdate func(current *State, args ...any)       // Update is called whenever FSM.Update() is called and the state is active.
 	OnExit   func(current, next *State, args ...any) // Exit is called when the state is exited as the FSM transitions from the current state to a new one.
 
-	// Allowed is a function that determines if one State allows transition to another through
-	// the FSM.Change() function.
-	// If the function returns true, the state is switched; if not, the state remains the same.
+	// Allowed is a function that determines if a State is allowed to be transitioned to from another
+	// the FSM.Set() function.
+	// If the function returns true, the state is switched; if not, the state remains the same as the original (sourceState).
 	// If the function is not defined, then all state transitions are allowed.
-	Allowed func(targetState *State) bool
+	Allowed func(sourceState *State) bool
 
 	// Allows you to define tags to identify and check for States.
 	Tags []any
@@ -136,7 +138,7 @@ func (f *FSM) Set(toStateID any, args ...any) error {
 		return errors.New(ErrorInvalidState)
 	}
 
-	if f.currentState != nil && f.currentState.Allowed != nil && !f.currentState.Allowed(nextState) {
+	if nextState.Allowed != nil && !nextState.Allowed(f.currentState) {
 		return errors.New(ErrorStateSwitchInvalid)
 	}
 
